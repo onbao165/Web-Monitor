@@ -1,0 +1,176 @@
+from typing import List, Optional
+from datetime import datetime
+
+from sqlalchemy.orm import Session
+
+from src.models.monitor import BaseMonitor, UrlMonitor, DatabaseMonitor, MonitorType, MonitorStatus
+from .models import MonitorModel
+
+class MonitorRepository:
+    """Repository for Monitor operations"""
+    
+    @staticmethod
+    def save(session: Session, monitor: BaseMonitor) -> BaseMonitor:
+        """Save a monitor to the database"""
+        # Check if monitor already exists
+        db_monitor = session.query(MonitorModel).filter(MonitorModel.id == monitor.id).first()
+        
+        if db_monitor:
+            # Update existing monitor
+            db_monitor.name = monitor.name
+            db_monitor.space_id = monitor.space_id
+            db_monitor.monitor_type = monitor.monitor_type.value
+            db_monitor.enabled = monitor.enabled
+            db_monitor.status = monitor.status.value
+            db_monitor.check_interval_seconds = monitor.check_interval_seconds
+            db_monitor.updated_at = datetime.now()
+            db_monitor.last_checked_at = monitor.last_checked_at
+        else:
+            # Create new monitor
+            db_monitor = MonitorModel(
+                id=monitor.id,
+                name=monitor.name,
+                space_id=monitor.space_id,
+                monitor_type=monitor.monitor_type.value,
+                enabled=monitor.enabled,
+                status=monitor.status.value,
+                check_interval_seconds=monitor.check_interval_seconds,
+                created_at=monitor.created_at,
+                updated_at=monitor.updated_at,
+                last_checked_at=monitor.last_checked_at
+            )
+            session.add(db_monitor)
+        
+        # Set type-specific fields
+        if isinstance(monitor, UrlMonitor):
+            db_monitor.url = monitor.url
+            db_monitor.expected_status_code = monitor.expected_status_code
+            db_monitor.timeout_seconds = monitor.timeout_seconds
+            db_monitor.check_ssl = monitor.check_ssl
+            db_monitor.follow_redirects = monitor.follow_redirects
+            db_monitor.check_content = monitor.check_content
+        elif isinstance(monitor, DatabaseMonitor):
+            db_monitor.db_type = monitor.db_type
+            db_monitor.host = monitor.host
+            db_monitor.port = monitor.port
+            db_monitor.database = monitor.database
+            db_monitor.username = monitor.username
+            db_monitor._encrypted_password = monitor._encrypted_password
+            db_monitor.connection_timeout_seconds = monitor.connection_timeout_seconds
+            db_monitor.query_timeout_seconds = monitor.query_timeout_seconds
+            db_monitor.test_query = monitor.test_query
+        
+        return monitor
+    
+    @staticmethod
+    def get_by_id(session: Session, monitor_id: str) -> Optional[BaseMonitor]:
+        """Get a monitor by ID"""
+        db_monitor = session.query(MonitorModel).filter(MonitorModel.id == monitor_id).first()
+        if not db_monitor:
+            return None
+        
+        # Create appropriate monitor type based on monitor_type
+        if db_monitor.monitor_type == MonitorType.URL.value:
+            return UrlMonitor(
+                id=db_monitor.id,
+                name=db_monitor.name,
+                space_id=db_monitor.space_id,
+                monitor_type=MonitorType(db_monitor.monitor_type),
+                enabled=db_monitor.enabled,
+                status=MonitorStatus(db_monitor.status),
+                check_interval_seconds=db_monitor.check_interval_seconds,
+                created_at=db_monitor.created_at,
+                updated_at=db_monitor.updated_at,
+                last_checked_at=db_monitor.last_checked_at,
+                url=db_monitor.url,
+                expected_status_code=db_monitor.expected_status_code,
+                timeout_seconds=db_monitor.timeout_seconds,
+                check_ssl=db_monitor.check_ssl,
+                follow_redirects=db_monitor.follow_redirects,
+                check_content=db_monitor.check_content
+            )
+        elif db_monitor.monitor_type == MonitorType.DATABASE.value:
+            return DatabaseMonitor(
+                id=db_monitor.id,
+                name=db_monitor.name,
+                space_id=db_monitor.space_id,
+                monitor_type=MonitorType(db_monitor.monitor_type),
+                enabled=db_monitor.enabled,
+                status=MonitorStatus(db_monitor.status),
+                check_interval_seconds=db_monitor.check_interval_seconds,
+                created_at=db_monitor.created_at,
+                updated_at=db_monitor.updated_at,
+                last_checked_at=db_monitor.last_checked_at,
+                db_type=db_monitor.db_type,
+                host=db_monitor.host,
+                port=db_monitor.port,
+                database=db_monitor.database,
+                username=db_monitor.username,
+                _encrypted_password=db_monitor._encrypted_password,
+                connection_timeout_seconds=db_monitor.connection_timeout_seconds,
+                query_timeout_seconds=db_monitor.query_timeout_seconds,
+                test_query=db_monitor.test_query
+            )
+        return None
+    
+    @staticmethod
+    def get_by_space_id(session: Session, space_id: str) -> List[BaseMonitor]:
+        """Get all monitors for a space"""
+        db_monitors = session.query(MonitorModel).filter(MonitorModel.space_id == space_id).all()
+        monitors = []
+        
+        for db_monitor in db_monitors:
+            # Create appropriate monitor type based on monitor_type
+            if db_monitor.monitor_type == MonitorType.URL.value:
+                monitors.append(UrlMonitor(
+                    id=db_monitor.id,
+                    name=db_monitor.name,
+                    space_id=db_monitor.space_id,
+                    monitor_type=MonitorType(db_monitor.monitor_type),
+                    enabled=db_monitor.enabled,
+                    status=MonitorStatus(db_monitor.status),
+                    check_interval_seconds=db_monitor.check_interval_seconds,
+                    created_at=db_monitor.created_at,
+                    updated_at=db_monitor.updated_at,
+                    last_checked_at=db_monitor.last_checked_at,
+                    url=db_monitor.url,
+                    expected_status_code=db_monitor.expected_status_code,
+                    timeout_seconds=db_monitor.timeout_seconds,
+                    check_ssl=db_monitor.check_ssl,
+                    follow_redirects=db_monitor.follow_redirects,
+                    check_content=db_monitor.check_content
+                ))
+            elif db_monitor.monitor_type == MonitorType.DATABASE.value:
+                monitors.append(DatabaseMonitor(
+                    id=db_monitor.id,
+                    name=db_monitor.name,
+                    space_id=db_monitor.space_id,
+                    monitor_type=MonitorType(db_monitor.monitor_type),
+                    enabled=db_monitor.enabled,
+                    status=MonitorStatus(db_monitor.status),
+                    check_interval_seconds=db_monitor.check_interval_seconds,
+                    created_at=db_monitor.created_at,
+                    updated_at=db_monitor.updated_at,
+                    last_checked_at=db_monitor.last_checked_at,
+                    db_type=db_monitor.db_type,
+                    host=db_monitor.host,
+                    port=db_monitor.port,
+                    database=db_monitor.database,
+                    username=db_monitor.username,
+                    _encrypted_password=db_monitor._encrypted_password,
+                    connection_timeout_seconds=db_monitor.connection_timeout_seconds,
+                    query_timeout_seconds=db_monitor.query_timeout_seconds,
+                    test_query=db_monitor.test_query
+                ))
+        
+        return monitors
+    
+    @staticmethod
+    def delete(session: Session, monitor_id: str) -> bool:
+        """Delete a monitor by ID"""
+        db_monitor = session.query(MonitorModel).filter(MonitorModel.id == monitor_id).first()
+        if not db_monitor:
+            return False
+        
+        session.delete(db_monitor)
+        return True
