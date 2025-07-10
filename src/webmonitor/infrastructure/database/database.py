@@ -8,28 +8,14 @@ from .space_repository import SpaceRepository
 from .monitor_repository import MonitorRepository
 from .result_repository import ResultRepository
 from webmonitor.models import Space, BaseMonitor, MonitorResult
-from webmonitor.config import get_config_manager
-import os
-import configparser
 
 class Database:
     # Database access layer using SQLAlchemy
     
     def __init__(self, db_url: str = None):
         if db_url is None:
-            # Try to get from config file
-            config_file = os.getenv('WEBMONITOR_CONFIG', '/etc/webmonitor/webmonitor.conf')
-            if os.path.exists(config_file):
-                config = configparser.ConfigParser()
-                config.read(config_file)
-                if 'database' in config and 'path' in config['database']:
-                    db_path = config['database']['path']
-                    db_url = f"sqlite:///{db_path}"
-                else:
-                    db_url = "sqlite:///var/lib/webmonitor/webmonitor.db"
-            else:
-                db_url = "sqlite:///var/lib/webmonitor/webmonitor.db"
-            
+            db_url = "sqlite:////var/lib/webmonitor/webmonitor.db"   
+
         self.engine = create_engine(
             db_url, 
             poolclass=QueuePool,
@@ -192,5 +178,6 @@ class Database:
             return ResultRepository.get_cleanup_preview(session, keep_healthy_days, keep_unhealthy_days)
         finally:
             session.close()
+
 
 
