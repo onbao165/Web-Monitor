@@ -31,7 +31,7 @@ class EmailService:
                 self.username = email_config.get('username')
                 self.password = email_config.get('password')
                 self.from_name = email_config.get('from_name', 'Web Monitor')
-                self.logger.info("Email service configured from unified config")
+                self.logger.info("Email service configured from config manager")
                 return True
             else:
                 self.logger.warning("No email configuration found")

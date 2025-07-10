@@ -1,31 +1,15 @@
-import os
 import base64
-from pathlib import Path
 from typing import Optional
 from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 class EncryptionService:
     # Service for encrypting and decrypting sensitive data like passwords
 
-    def __init__(self, use_config_manager: bool = True):
-        self.use_config_manager = use_config_manager
+    def __init__(self):
         self._fernet = None
-        self._ensure_key_exists()
-
-    def _ensure_key_exists(self):
-        if self.use_config_manager:
-            self._load_key_from_config()
-        else:
-            # Fallback to file-based key for backward compatibility
-            key_file_path = Path("data/.encryption_key")
-            if not key_file_path.exists():
-                self._generate_new_key_file(key_file_path)
-            self._load_key_from_file(key_file_path)
+        self._load_key_from_config()
 
     def _load_key_from_config(self):
-        """Load encryption key from unified config."""
         try:
             from webmonitor.config import get_config_manager
             config_manager = get_config_manager()
@@ -36,40 +20,12 @@ class EncryptionService:
                 key = Fernet.generate_key()
                 key_b64 = base64.b64encode(key).decode('utf-8')
                 config_manager.set_encryption_key(key_b64)
-                print("🔑 New encryption key generated and saved to config")
 
             # Decode and use the key
             key = base64.b64decode(key_b64.encode('utf-8'))
             self._fernet = Fernet(key)
         except Exception as e:
-            raise Exception(f"Failed to load encryption key from config: {e}")
-
-    def _generate_new_key_file(self, key_file_path: Path):
-        """Generate new key file (fallback method)."""
-        key_file_path.parent.mkdir(exist_ok=True)
-
-        key = Fernet.generate_key()
-
-        with open(key_file_path, 'wb') as key_file:
-            key_file.write(key)
-
-        # Set file permissions to be readable only by owner (on Unix-like systems)
-        try:
-            os.chmod(key_file_path, 0o600)
-        except OSError:
-            # Windows doesn't support chmod the same way
-            pass
-
-        print(f"🔑 New encryption key generated and saved to {key_file_path}")
-
-    def _load_key_from_file(self, key_file_path: Path):
-        """Load key from file (fallback method)."""
-        try:
-            with open(key_file_path, 'rb') as key_file:
-                key = key_file.read()
-                self._fernet = Fernet(key)
-        except Exception as e:
-            raise Exception(f"Failed to load encryption key: {e}")
+            raise Exception(f"Failed to load encryption key from config manager: {e}")
     
     def encrypt_data(self, data: str) -> str:
         if not data:
@@ -117,8 +73,7 @@ class EncryptionService:
         except:
             return False
     
-    def rotate_key(self, old_key_file: Optional[str] = None):
-        # Rotate encryption key (for advanced security)
+    def rotate_key(self):
         # This is a placeholder for key rotation functionality
         raise NotImplementedError("Key rotation not implemented yet")
 
@@ -126,10 +81,9 @@ class EncryptionService:
 _encryption_service = None
 
 def get_encryption_service() -> EncryptionService:
-    # Get the global encryption service instance
     global _encryption_service
     if _encryption_service is None:
-        _encryption_service = EncryptionService(use_config_manager=True)
+        _encryption_service = EncryptionService()
     return _encryption_service
 
 def encrypt_password(password: str) -> str:

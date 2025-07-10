@@ -88,7 +88,7 @@ def email_configure():
     else:
         click.echo(click.style("✓ Connection test successful!", fg='green'))
 
-    # Save configuration to unified config
+    # Save configuration
     current_config = config_manager.get_config() or {}
     current_config['email'] = email_config
 
@@ -202,7 +202,7 @@ def email_update(smtp_host, smtp_port, username, from_name, password):
         click.echo(click.style(f"Configuration error: {message}", fg='red'), err=True)
         sys.exit(1)
 
-    # Save updated configuration to unified config
+    # Save updated configuration
     current_config = config_manager.get_config() or {}
     current_config['email'] = current_email_config
 
