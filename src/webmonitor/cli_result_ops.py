@@ -1,5 +1,5 @@
 import click
-from .cli_utils import send_command, format_response, resolve_monitor_identifier
+from .cli_utils import send_command, format_response, resolve_monitor_identifier, resolve_space_identifier
 
 # Define the result command group
 @click.group(help='Result management commands')
