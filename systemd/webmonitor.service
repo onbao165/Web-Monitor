@@ -1,0 +1,24 @@
+[Unit]
+Description=Web Monitor Daemon
+After=network.target
+
+[Service]
+Type=simple
+User=webmonitor
+Group=webmonitor
+WorkingDirectory=/opt/webmonitor
+Environment=SOCKET_PATH=/var/run/webmonitor/webmonitor.sock
+
+# How to start the program
+ExecStart=/opt/webmonitor/venv/bin/python -m webmonitor.daemon
+
+# Restart if it crashes
+Restart=always
+RestartSec=5
+
+# Where to put logs
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
