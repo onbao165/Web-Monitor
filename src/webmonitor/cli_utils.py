@@ -6,7 +6,7 @@ import uuid
 from typing import Dict, Any, Tuple
 
 # Config socket path
-SOCKET_PATH = os.getenv('SOCKET_PATH', '/tmp/webmonitor.sock')
+SOCKET_PATH = os.getenv('SOCKET_PATH', '/var/run/webmonitor/webmonitor.sock')
 
 def send_command(command: Dict[str, Any]) -> Dict[str, Any]:
     try:
