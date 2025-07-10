@@ -115,6 +115,7 @@ sudo systemctl daemon-reload
 Create a symbolic link for global CLI access:
 ```bash
 sudo ln -sf /opt/webmonitor/venv/bin/webmonitor /usr/local/bin/webmonitor
+sudo ln -sf /opt/webmonitor/venv/bin/webmonitor /usr/local/bin/wm
 ```
 
 ## Service Management
@@ -183,11 +184,13 @@ If the `webmonitor` command is not found after installation:
 1. Check if the symlink exists:
    ```bash
    ls -la /usr/local/bin/webmonitor
+   ls -la /usr/local/bin/wm
    ```
 
 2. Recreate the symlink:
    ```bash
    sudo ln -sf /opt/webmonitor/venv/bin/webmonitor /usr/local/bin/webmonitor
+   sudo ln -sf /opt/webmonitor/venv/bin/webmonitor /usr/local/bin/wm
    ```
 
 ## Uninstallation
