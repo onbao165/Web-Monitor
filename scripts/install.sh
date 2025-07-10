@@ -12,6 +12,14 @@ fi
 # Python 3 is required to run the application
 if ! command -v python3 &> /dev/null; then
     echo "❌ Python 3 is required but not installed"
+    echo "   You can install it with 'sudo apt-get install python3'"
+    exit 1
+fi
+
+# Python venv is required to isolate dependencies
+if ! python3 -m venv --help &> /dev/null; then
+    echo "❌ Python venv is required but not installed"
+    echo "   You can install it with 'sudo apt-get install python3-venv'"
     exit 1
 fi
 

@@ -48,6 +48,7 @@ git clone https://github.com/onbao165/Web-Monitor.git
 cd Web-Monitor
 
 # Run the installation script (requires sudo)
+chmod +x ./scripts/install.sh
 sudo ./scripts/install.sh
 ```
 
@@ -60,6 +61,11 @@ If you prefer to install manually, follow these steps:
 Ensure Python 3 is installed:
 ```bash
 python3 --version
+```
+
+Ensure python3-venv is installed:
+```bash
+python3 -m venv --help
 ```
 
 #### 2. Create System User
@@ -199,6 +205,7 @@ To remove Web Monitor, use the provided uninstall script:
 
 ```bash
 # Complete removal (removes all data and configuration)
+chmod +x ./scripts/uninstall.sh
 sudo ./scripts/uninstall.sh
 
 # Preserve configuration files
