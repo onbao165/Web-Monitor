@@ -9,10 +9,9 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 class EncryptionService:
     # Service for encrypting and decrypting sensitive data like passwords
     
-    def __init__(self, key_file_path: str = "data/.encryption_key", key_length: int = 32):
+    def __init__(self, key_file_path: str = "data/.encryption_key"):
         self.key_file_path = Path(key_file_path)
         self._fernet = None
-        self.key_length = key_length
         self._ensure_key_exists()
     
     def _ensure_key_exists(self):
@@ -22,8 +21,8 @@ class EncryptionService:
     
     def _generate_new_key(self):
         self.key_file_path.parent.mkdir(exist_ok=True)
-        
-        key = Fernet.generate_key(self.key_length)
+
+        key = Fernet.generate_key()
         
         with open(self.key_file_path, 'wb') as key_file:
             key_file.write(key)

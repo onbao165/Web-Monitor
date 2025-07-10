@@ -6,3 +6,4 @@ pymysql>=1.0.0 # MySQL driver
 pyodbc>=4.0.0 # ODBC driver
 cryptography>=3.4.0 # For handling SSL/TLS
 schedule>=1.1.0 # For scheduling tasks
+PyYAML>=6.0 # For configuration

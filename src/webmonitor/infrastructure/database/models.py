@@ -25,12 +25,12 @@ class MonitorModel(Base):
     name = Column(String(100), nullable=False)
     space_id = Column(String(36), ForeignKey('spaces.id'), nullable=False)
     monitor_type = Column(String(20), nullable=False)
-    enabled = Column(Boolean, default=True)
     status = Column(String(20), nullable=False)
     check_interval_seconds = Column(Integer, default=300)
     created_at = Column(DateTime, nullable=False)
     updated_at = Column(DateTime, nullable=True)
     last_checked_at = Column(DateTime, nullable=True)
+    last_healthy_at = Column(DateTime, nullable=True)
     
     # URL monitor specific fields
     url = Column(String(500), nullable=True)
@@ -46,7 +46,7 @@ class MonitorModel(Base):
     port = Column(Integer, nullable=True)
     database = Column(String(100), nullable=True)
     username = Column(String(100), nullable=True)
-    _encrypted_password = Column(String(500), nullable=True)
+    encrypted_password = Column(String(500), nullable=True)
     connection_timeout_seconds = Column(Integer, nullable=True)
     query_timeout_seconds = Column(Integer, nullable=True)
     test_query = Column(Text, nullable=True)
@@ -63,9 +63,11 @@ class MonitorResultModel(Base):
     space_id = Column(String(36), ForeignKey('spaces.id'), nullable=False)
     timestamp = Column(DateTime, nullable=False)
     status = Column(String(20), nullable=False)
+    monitor_type = Column(String(20), nullable=False)
     response_time_ms = Column(Float, nullable=True)
-    error_message = Column(Text, nullable=True)
     details = Column(Text, nullable=True)  # Store as JSON string
+    failed_checks = Column(Integer, nullable=False)
+    check_list = Column(Text, nullable=True)  # Store as JSON string
     
     # Relationships
     monitor = relationship("MonitorModel", back_populates="results")

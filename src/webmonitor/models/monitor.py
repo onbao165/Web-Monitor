@@ -4,7 +4,7 @@ from datetime import datetime
 import json
 import uuid
 from enum import Enum
-from src.services import encrypt_password, decrypt_password
+from webmonitor.utils import encrypt_password, decrypt_password
 
 class MonitorType(Enum):
     URL = 'url'
@@ -19,16 +19,16 @@ class MonitorStatus(Enum):
 @dataclass
 class BaseMonitor:
     # Base class for all monitors
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     name: str
-    space_id: str # Space this monitor belongs to
+    space_id: str  # Space this monitor belongs to
     monitor_type: MonitorType
-    enabled: bool = True
-    status: MonitorStatus = MonitorStatus.UNKNOWN
-    check_interval_seconds: int = 300 # 5 minutes
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    status: MonitorStatus = MonitorStatus.OFFLINE
+    check_interval_seconds: int = 300  # 5 minutes
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     last_checked_at: Optional[datetime] = None
+    last_healthy_at: Optional[datetime] = None
 
     def __post_init__(self):
         if self.created_at is None:
@@ -41,6 +41,10 @@ class BaseMonitor:
         self.last_checked_at = datetime.now()
         self.update_timestamp()
 
+    def update_last_healthy_at(self):
+        self.last_healthy_at = datetime.now()
+        self.update_timestamp()
+
     def to_dict(self)->dict:
         # Converts the monitor object to a dictionary
         return {
@@ -48,12 +52,12 @@ class BaseMonitor:
             'name': self.name,
             'space_id': self.space_id,
             'monitor_type': self.monitor_type.value,
-            'enabled': self.enabled,
             'status': self.status.value,
             'check_interval_seconds': self.check_interval_seconds,
             'created_at': self.created_at.isoformat(), 
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'last_checked_at': self.last_checked_at.isoformat() if self.last_checked_at else None
+            'last_checked_at': self.last_checked_at.isoformat() if self.last_checked_at else None,
+            'last_healthy_at': self.last_healthy_at.isoformat() if self.last_healthy_at else None
         }
     
     @classmethod
@@ -64,7 +68,6 @@ class BaseMonitor:
             name=data['name'],
             space_id=data['space_id'],
             monitor_type=MonitorType(data['monitor_type']),
-            enabled=data['enabled'],
             status=MonitorStatus(data['status']),
             check_interval_seconds=data['check_interval_seconds'],
             created_at= datetime.fromisoformat(data['created_at']),
@@ -73,12 +76,23 @@ class BaseMonitor:
             monitor.updated_at = datetime.fromisoformat(data['updated_at'])
         if (data.get('last_checked_at')):
             monitor.last_checked_at = datetime.fromisoformat(data['last_checked_at'])
+        if (data.get('last_healthy_at')):
+            monitor.last_healthy_at = datetime.fromisoformat(data['last_healthy_at'])
         return monitor
+
+    # Add these methods to make BaseMonitor hashable
+    def __hash__(self):
+        return hash(self.id)
+    
+    def __eq__(self, other):
+        if not isinstance(other, BaseMonitor):
+            return False
+        return self.id == other.id
 
 @dataclass
 class UrlMonitor(BaseMonitor):
     # Represents a URL monitor
-    url: str
+    url: str = field(default="")
     expected_status_code: int = 200
     timeout_seconds: int = 30
     check_ssl: bool = True
@@ -110,7 +124,6 @@ class UrlMonitor(BaseMonitor):
             name=data['name'],
             space_id=data['space_id'],
             monitor_type=MonitorType(data['monitor_type']),
-            enabled=data['enabled'],
             status=MonitorStatus(data['status']),
             check_interval_seconds=data['check_interval_seconds'],
             created_at= datetime.fromisoformat(data['created_at']),
@@ -124,19 +137,29 @@ class UrlMonitor(BaseMonitor):
             monitor.updated_at = datetime.fromisoformat(data['updated_at'])
         if data.get('last_checked_at'):
             monitor.last_checked_at = datetime.fromisoformat(data['last_checked_at'])
+        if data.get('last_healthy_at'):
+            monitor.last_healthy_at = datetime.fromisoformat(data['last_healthy_at'])
         if data.get('check_content'):
             monitor.check_content = data['check_content']
         return monitor
 
+    def __hash__(self):
+        return hash(self.id)
+    
+    def __eq__(self, other):
+        if not isinstance(other, UrlMonitor):
+            return False
+        return self.id == other.id
+
 @dataclass
 class DatabaseMonitor(BaseMonitor):
     # Database monitoring configuration
-    db_type: str  # mysql, postgresql, sqlserver
-    host: str
-    port: int
-    database: str
-    username: str
-    _encrypted_password: str = ""
+    db_type: str = ""  # mysql, postgresql, sqlserver
+    host: str = ""
+    port: int = 0
+    database: str = ""
+    username: str = ""
+    encrypted_password: str = ""
     connection_timeout_seconds: int = 10
     query_timeout_seconds: int = 30
     test_query: str = "SELECT 1"  # Simple query to test connection
@@ -147,10 +170,10 @@ class DatabaseMonitor(BaseMonitor):
 
     @property
     def password(self)->str:
-        if not self._encrypted_password:
+        if not self.encrypted_password:
             return ""
         try:
-            return decrypt_password(self._encrypted_password)
+            return decrypt_password(self.encrypted_password)
         except Exception as e:
             print(f"Warning: Failed to decrypt password for monitor {self.name}: {e}")
             return ""
@@ -158,10 +181,10 @@ class DatabaseMonitor(BaseMonitor):
     @password.setter
     def password(self, plain_password: str):
         if not plain_password:
-            self._encrypted_password = ""
+            self.encrypted_password = ""
         else:
             try:
-                self._encrypted_password = encrypt_password(plain_password)
+                self.encrypted_password = encrypt_password(plain_password)
                 self.update_timestamp()
             except Exception as e:
                 raise Exception(f"Failed to encrypt password for monitor {self.name}: {e}")
@@ -189,7 +212,7 @@ class DatabaseMonitor(BaseMonitor):
             'port': self.port,
             'database': self.database,
             'username': self.username,
-            'password': self._encrypted_password,
+            'password': self.encrypted_password,
             'connection_timeout_seconds': self.connection_timeout_seconds,
             'query_timeout_seconds': self.query_timeout_seconds,
             'test_query': self.test_query
@@ -204,7 +227,6 @@ class DatabaseMonitor(BaseMonitor):
             name=data['name'],
             space_id=data['space_id'],
             monitor_type=MonitorType(data['monitor_type']),
-            enabled=data['enabled'],
             status=MonitorStatus(data['status']),
             check_interval_seconds=data['check_interval_seconds'],
             created_at= datetime.fromisoformat(data['created_at']),
@@ -213,7 +235,7 @@ class DatabaseMonitor(BaseMonitor):
             port=data['port'],
             database=data['database'],
             username=data['username'],
-            _encrypted_password=data['password'],
+            encrypted_password=data['password'],
             connection_timeout_seconds=data['connection_timeout_seconds'],
             query_timeout_seconds=data['query_timeout_seconds'],
             test_query=data['test_query'],
@@ -222,19 +244,31 @@ class DatabaseMonitor(BaseMonitor):
             monitor.updated_at = datetime.fromisoformat(data['updated_at'])
         if data.get('last_checked_at'):
             monitor.last_checked_at = datetime.fromisoformat(data['last_checked_at'])
+        if data.get('last_healthy_at'):
+            monitor.last_healthy_at = datetime.fromisoformat(data['last_healthy_at'])
         return monitor
+
+    def __hash__(self):
+        return hash(self.id)
+    
+    def __eq__(self, other):
+        if not isinstance(other, DatabaseMonitor):
+            return False
+        return self.id == other.id
 
 @dataclass
 class MonitorResult:
     # Result of a monitor check
-    id: str = field(default_factory=lambda: str(uuid.uuid4())),
     monitor_id: str
     space_id: str
     timestamp: datetime
     status: MonitorStatus
-    response_time_ms: Optional[float] = None
-    error_message: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
+    monitor_type: MonitorType
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    response_time_ms: Optional[float] = None # Response time in milliseconds
+    details: Optional[Dict[str, Any]] = None # Details of checks that failed or passed
+    failed_checks: int = 0
+    check_list: Optional[List[str]] = None
     
     def __post_init__(self):
         if self.timestamp is None:
@@ -248,9 +282,11 @@ class MonitorResult:
             'space_id': self.space_id,
             'timestamp': self.timestamp.isoformat(),
             'status': self.status.value,
+            'monitor_type': self.monitor_type.value,
             'response_time_ms': self.response_time_ms,
-            'error_message': self.error_message,
-            'details': self.details
+            'details': self.details,
+            'failed_checks': self.failed_checks,
+            'check_list': self.check_list
         }
     
     @classmethod
@@ -262,8 +298,10 @@ class MonitorResult:
             space_id=data['space_id'],
             timestamp=datetime.fromisoformat(data['timestamp']),
             status=MonitorStatus(data['status']),
+            monitor_type=MonitorType(data['monitor_type']),
             response_time_ms=data.get('response_time_ms'),
-            error_message=data.get('error_message'),
-            details=data.get('details')
+            details=data.get('details'),
+            failed_checks=data['failed_checks'],
+            check_list=data.get('check_list')
         )
         return result

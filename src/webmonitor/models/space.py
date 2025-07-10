@@ -7,8 +7,8 @@ import uuid
 @dataclass
 class Space:
     # Represents a space in the database
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     name: str
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     description: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
