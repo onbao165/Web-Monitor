@@ -36,6 +36,33 @@ A web monitoring application that runs as a background daemon on Linux systems.
 - Python 3.x
 - Root/sudo access for installation
 
+### Additional Dependencies for Database Monitoring
+
+If you plan to use database monitoring features, you'll need to install additional dependencies:
+
+#### For All Database Types
+```bash
+sudo apt-get update
+sudo apt-get install -y unixodbc unixodbc-dev
+```
+
+#### For SQL Server Monitoring
+```bash
+# Add Microsoft repository
+curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
+
+# Install ODBC Driver
+sudo apt-get update
+sudo ACCEPT_EULA=Y apt-get install -y msodbcsql17
+```
+
+#### For PostgreSQL Monitoring
+The PostgreSQL driver is included in the Python dependencies.
+
+#### For MySQL Monitoring
+The MySQL driver is included in the Python dependencies.
+
 ## Installation
 
 ### Automated Installation
