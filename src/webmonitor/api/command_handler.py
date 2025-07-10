@@ -21,7 +21,7 @@ class CommandHandler:
         self.monitor_handler = MonitorCommandHandler(database, scheduler)
         self.space_handler = SpaceCommandHandler(database, scheduler)
         self.result_handler = ResultCommandHandler(database)
-        self.system_handler = SystemCommandHandler(scheduler)
+        self.system_handler = SystemCommandHandler(scheduler, database)
         
         # Command routing map
         self.command_routes = {
@@ -49,6 +49,11 @@ class CommandHandler:
             
             # System commands
             'status': self.system_handler.get_status,
+
+            # Job commands
+            'get_job_status': self.system_handler.get_job_status,
+            'run_job_manually': self.system_handler.run_job_manually,
+            'get_cleanup_preview': self.system_handler.get_cleanup_preview,
 
             # Email commands
             'reload_email_config': self.reload_email_config,

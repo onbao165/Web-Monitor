@@ -2,9 +2,9 @@ import os
 import sys
 import yaml
 import click
-from typing import Dict, Any, List
+from .cli_utils import send_command, format_response, _format_system_status
 
-def load_yaml_file(file_path: str) -> Dict:
+def load_yaml_file(file_path: str) -> dict:
     try:
         with open(file_path, 'r') as f:
             return yaml.safe_load(f)
@@ -12,7 +12,7 @@ def load_yaml_file(file_path: str) -> Dict:
         click.echo(click.style(f"Error loading YAML file: {str(e)}", fg='red'), err=True)
         sys.exit(1)
 
-def save_yaml_file(data: Dict, file_path: str) -> None:
+def save_yaml_file(data: dict, file_path: str) -> None:
     try:
         with open(file_path, 'w') as f:
             yaml.dump(data, f, default_flow_style=False)
@@ -20,80 +20,8 @@ def save_yaml_file(data: Dict, file_path: str) -> None:
         click.echo(click.style(f"Error saving YAML file: {str(e)}", fg='red'), err=True)
         sys.exit(1)
 
-def create_space_from_file(send_command, file: str) -> Dict:
-    space_data = load_yaml_file(file)
-    return send_command({
-        'action': 'create_space',
-        'space': space_data
-    })
-
-def update_space_from_file(send_command, file: str) -> Dict:
-    space_data = load_yaml_file(file)
-    
-    return send_command({
-        'action': 'update_space',
-        'space': space_data
-    })
-
-def create_monitor_from_file(send_command, file: str) -> Dict:
-    monitor_data = load_yaml_file(file)
-
-    # Ensure space_id is provided
-    if 'space_id' not in monitor_data:
-        click.echo(click.style("Monitor definition is missing required 'space_id' field", fg='red'), err=True)
-        sys.exit(1)
-
-    return send_command({
-        'action': 'create_monitor',
-        'monitor': monitor_data
-    })
-
-def update_monitor_from_file(send_command, file: str) -> Dict:
-    monitor_data = load_yaml_file(file)
-    
-    return send_command({
-        'action': 'update_monitor',
-        'monitor': monitor_data
-    })
-
-def export_space(send_command, space_id: str, output: str = None) -> None:
-    response = send_command({'action': 'get_space', 'space_id': space_id})
-    
-    if response.get('status') != 'success':
-        return response
-    
-    space_data = response.get('space', {})
-    yaml_str = yaml.dump(space_data, default_flow_style=False)
-    
-    if output:
-        with open(output, 'w') as f:
-            f.write(yaml_str)
-        click.echo(f"Space exported to {output}")
-    else:
-        click.echo(yaml_str)
-    
-    return response
-
-def export_monitor(send_command, monitor_id: str, output: str = None) -> None:
-    response = send_command({'action': 'get_monitor', 'monitor_id': monitor_id})
-    
-    if response.get('status') != 'success':
-        return response
-    
-    monitor_data = response.get('monitor', {})
-    yaml_str = yaml.dump(monitor_data, default_flow_style=False)
-    
-    if output:
-        with open(output, 'w') as f:
-            f.write(yaml_str)
-        click.echo(f"Monitor exported to {output}")
-    else:
-        click.echo(yaml_str)
-    
-    return response
-
 def create_config(send_command, yaml_file: str, dry_run: bool = False) -> None:
-    """Create resources from YAML config. Allows optional IDs."""
+    # Create resources from YAML config. Allows optional IDs.
     config = load_yaml_file(yaml_file)
 
     # Track results
@@ -166,7 +94,7 @@ def create_config(send_command, yaml_file: str, dry_run: bool = False) -> None:
         click.echo(f"  Monitors: {results['monitors']['created']} created, {results['monitors']['failed']} failed")
 
 def update_config(send_command, yaml_file: str, dry_run: bool = False) -> None:
-    """Update resources from YAML config. Requires IDs for all resources."""
+    # Update resources from YAML config. Requires IDs for all resources.
     config = load_yaml_file(yaml_file)
 
     # Validate that all resources have IDs
@@ -279,3 +207,170 @@ def export_all(send_command, output: str) -> None:
     click.echo(f"Exported {len(config['spaces'])} spaces and {len(config['monitors'])} monitors to {output}")
 
     return {'status': 'success', 'message': 'Export completed successfully'}
+
+# Individual system commands (not in a group)
+@click.command('status')
+def status():
+    response = send_command({'action': 'status'})
+    if response.get('status') == 'success':
+        _format_system_status(response)
+    else:
+        format_response(response)
+
+@click.command('create', help='Create spaces and monitors from a YAML file')
+@click.argument('yaml_file', type=click.Path(exists=True, file_okay=True, dir_okay=False, readable=True))
+@click.option('--dry-run', is_flag=True, help='Show what would be created without making changes')
+def create_config_command(yaml_file, dry_run):
+    create_config(send_command, yaml_file, dry_run)
+
+@click.command('update', help='Update spaces and monitors from a YAML file')
+@click.argument('yaml_file', type=click.Path(exists=True, file_okay=True, dir_okay=False, readable=True))
+@click.option('--dry-run', is_flag=True, help='Show what would be updated without making changes')
+def update_config_command(yaml_file, dry_run):
+    update_config(send_command, yaml_file, dry_run)
+
+@click.command('export-all', help='Export all spaces and monitors to a YAML file')
+@click.option('--output', '-o', type=click.Path(), required=True, help='Output file')
+def export_all_command(output):
+    response = export_all(send_command, output)
+    if response.get('status') != 'success':
+        format_response(response)
+
+def print_sample_config_create() -> None:
+    sample = {
+        'spaces': [
+            {
+                'name': 'Production Environment',
+                'description': 'Monitoring for production services',
+                'notification_emails': [
+                    'ops-team@example.com',
+                    'alerts@example.com'
+                ],
+                'id': 'production-space-id'
+            },
+            {
+                'name': 'Development Environment',
+                'description': 'Monitoring for development services',
+                'notification_emails': [
+                    'dev-team@example.com'
+                ],
+                'id': 'development-space-id'
+            }
+        ],
+        'monitors': [
+            {
+                'name': 'Main Website',
+                'space_id': 'production-space-id',
+                'monitor_type': 'url',
+                'url': 'https://www.example.com',
+                'expected_status_code': 200,
+                'timeout_seconds': 30,
+                'check_ssl': True,
+                'follow_redirects': True,
+                'check_interval_seconds': 300
+            },
+            {
+                'name': 'Production Database',
+                'space_id': 'production-space-id',
+                'monitor_type': 'database',
+                'db_type': 'postgresql',
+                'host': 'prod-db.example.com',
+                'port': 5432,
+                'database': 'app_production',
+                'username': 'monitor_user',
+                'password': 'secure_password',
+                'connection_timeout_seconds': 10,
+                'query_timeout_seconds': 30,
+                'test_query': 'SELECT 1',
+                'check_interval_seconds': 600
+            }
+        ]
+    }
+
+    click.echo("# Sample YAML for create config command")
+    click.echo("# Save this to a file and use: webmonitor create <file>")
+    click.echo("# IDs are optional - will be auto-generated if not provided")
+    click.echo("# You can reference space IDs in monitors, or use the generated ones")
+    click.echo()
+    click.echo(yaml.dump(sample, default_flow_style=False))
+
+def print_sample_config_update() -> None:
+    sample = {
+        'spaces': [
+            {
+                'id': 'existing-production-space-id',
+                'name': 'Updated Production Environment',
+                'description': 'Updated monitoring for production services',
+                'notification_emails': [
+                    'ops-team@example.com',
+                    'alerts@example.com',
+                    'manager@example.com'
+                ]
+            },
+            {
+                'id': 'existing-dev-space-id',
+                'name': 'Updated Development Environment',
+                'description': 'Updated monitoring for development services',
+                'notification_emails': [
+                    'dev-team@example.com',
+                    'qa-team@example.com'
+                ]
+            }
+        ],
+        'monitors': [
+            {
+                'id': 'existing-website-monitor-id',
+                'name': 'Updated Main Website',
+                'space_id': 'existing-production-space-id',
+                'monitor_type': 'url',
+                'url': 'https://www.updated-example.com',
+                'expected_status_code': 200,
+                'timeout_seconds': 45,
+                'check_ssl': True,
+                'follow_redirects': True,
+                'check_content': 'Welcome to our updated site',
+                'check_interval_seconds': 300
+            },
+            {
+                'id': 'existing-database-monitor-id',
+                'name': 'Updated Production Database',
+                'space_id': 'existing-production-space-id',
+                'monitor_type': 'database',
+                'db_type': 'postgresql',
+                'host': 'new-prod-db.example.com',
+                'port': 5432,
+                'database': 'app_production_v2',
+                'username': 'updated_monitor_user',
+                'password': 'new_secure_password',
+                'connection_timeout_seconds': 15,
+                'query_timeout_seconds': 45,
+                'test_query': 'SELECT COUNT(*) FROM health_status',
+                'check_interval_seconds': 600
+            }
+        ]
+    }
+
+    click.echo("# Sample YAML for update config command")
+    click.echo("# Save this to a file and use: webmonitor update <file>")
+    click.echo("# IDs are required for all resources when updating")
+    click.echo("# All spaces and monitors must have existing IDs")
+    click.echo()
+    click.echo(yaml.dump(sample, default_flow_style=False))
+
+@click.command('sample-create')
+def sample_create():
+    print_sample_config_create()
+
+@click.command('sample-update')
+def sample_update():
+    print_sample_config_update()
+
+# List of individual commands to be added to the main CLI
+SYSTEM_COMMANDS = [
+    status,
+    create_config_command,
+    update_config_command,
+    export_all_command,
+    sample_create,
+    sample_update
+]

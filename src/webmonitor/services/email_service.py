@@ -21,17 +21,17 @@ class EmailService:
 
     def load_from_config(self) -> bool:
         try:
-            from .email_config import get_email_config
-            email_config = get_email_config()
-            smtp_settings = email_config.get_smtp_settings()
+            from webmonitor.config import get_config_manager
+            config_manager = get_config_manager()
+            email_config = config_manager.get_email_config()
 
-            if smtp_settings:
-                self.smtp_host = smtp_settings['smtp_host']
-                self.smtp_port = smtp_settings['smtp_port']
-                self.username = smtp_settings['username']
-                self.password = smtp_settings['password']
-                self.from_name = smtp_settings['from_name']
-                self.logger.info("Email service configured from config file")
+            if email_config:
+                self.smtp_host = email_config.get('smtp_host', 'smtp.gmail.com')
+                self.smtp_port = email_config.get('smtp_port', 587)
+                self.username = email_config.get('username')
+                self.password = email_config.get('password')
+                self.from_name = email_config.get('from_name', 'Web Monitor')
+                self.logger.info("Email service configured from unified config")
                 return True
             else:
                 self.logger.warning("No email configuration found")

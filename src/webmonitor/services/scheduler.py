@@ -2,7 +2,7 @@ import threading
 import time
 import logging
 import schedule
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Any
 from datetime import datetime
 from .db_checker import check_db
 from .url_checker import check_url
@@ -16,8 +16,10 @@ Handles scheduling, stopping, and listing monitors.
 """
 
 class MonitorScheduler:
-    database: Database 
+    database: Database
     running_monitors: Dict[BaseMonitor, schedule.Job]
+    system_jobs: Dict[str, Any]
+    system_job_schedules: Dict[str, schedule.Job]
     monitor_lock: threading.Lock
     logger: logging.Logger
     stop_event: threading.Event
@@ -26,9 +28,14 @@ class MonitorScheduler:
     def __init__(self, database: Database):
         self.database = database
         self.running_monitors: Dict[BaseMonitor, schedule.Job] = {}
-        self.monitor_lock = threading.Lock()  # For thread-safe operations 
+        self.system_jobs: Dict[str, Any] = {}
+        self.system_job_schedules: Dict[str, schedule.Job] = {}
+        self.monitor_lock = threading.Lock()  # For thread-safe operations
         self.logger = logging.getLogger(__name__)
-        
+
+        # Initialize system jobs
+        self._initialize_system_jobs()
+
         # Start the scheduler in a separate thread
         self.stop_event = threading.Event()
         self.scheduler_thread = threading.Thread(target=self._run_scheduler)
@@ -42,7 +49,6 @@ class MonitorScheduler:
             time.sleep(1)
     
     def _run_monitor(self, monitor: BaseMonitor):
-        # Run a monitor check and save the result
         try:
             self.logger.info(f"Running monitor check: {monitor.name} ({monitor.id})")
             
@@ -84,8 +90,40 @@ class MonitorScheduler:
         except Exception as e:
             self.logger.error(f"Error running monitor {monitor.name} ({monitor.id}): {str(e)}")
 
+    def _initialize_system_jobs(self):
+        from webmonitor.config import get_config_manager
+        from webmonitor.jobs.health_alert_job import HealthAlertJob
+        from webmonitor.jobs.data_cleanup_job import DataCleanupJob
+
+        config_manager = get_config_manager()
+
+        # Initialize health alert job
+        health_config = config_manager.get_health_alerts_config()
+        if health_config.get('enabled', True):
+            health_job = HealthAlertJob(self.database)
+            self.system_jobs['health_alert'] = health_job
+
+            # Schedule health alert job
+            interval_minutes = health_config.get('check_interval_minutes', 60)
+            job = schedule.every(interval_minutes).minutes.do(health_job.run)
+            self.system_job_schedules['health_alert'] = job
+
+            self.logger.info(f"Health alert job scheduled to run every {interval_minutes} minutes")
+
+        # Initialize data cleanup job
+        cleanup_config = config_manager.get_data_cleanup_config()
+        if cleanup_config.get('enabled', True):
+            cleanup_job = DataCleanupJob(self.database)
+            self.system_jobs['data_cleanup'] = cleanup_job
+
+            # Schedule data cleanup job
+            interval_hours = cleanup_config.get('cleanup_interval_hours', 24)
+            job = schedule.every(interval_hours).hours.do(cleanup_job.run)
+            self.system_job_schedules['data_cleanup'] = job
+
+            self.logger.info(f"Data cleanup job scheduled to run every {interval_hours} hours")
+
     def schedule_monitor(self, monitor: BaseMonitor) -> bool:
-        # Schedule a monitor to run at its specified interval
         with self.monitor_lock:
             # Check if monitor is already scheduled
             if any(m.id == monitor.id for m in self.running_monitors.keys()):
@@ -116,7 +154,6 @@ class MonitorScheduler:
             return True
         
     def stop_monitor(self, monitor_id: str) -> bool:
-        # Stop a monitor from running
         with self.monitor_lock:
             # Find the monitor with the given ID
             monitor_to_stop = None
@@ -147,7 +184,6 @@ class MonitorScheduler:
             return True
     
     def reschedule_monitor(self, monitor: BaseMonitor) -> bool:
-        # Reschedule a monitor to run at its specified interval
         with self.monitor_lock:
             # Find the monitor with the given ID
             monitor_to_reschedule = None
@@ -181,7 +217,6 @@ class MonitorScheduler:
 
     
     def list_running_monitors(self, space_id: Optional[str] = None, monitor_type: Optional[MonitorType] = None) -> List[BaseMonitor]:
-        # List all running monitors, optionally filtered by space_id and monitor_type
         with self.monitor_lock:
             if space_id is None:
                 # Return all monitors if no space_id is provided
@@ -201,8 +236,6 @@ class MonitorScheduler:
             return any(m.id == monitor_id for m in self.running_monitors.keys())
 
     def start_all_monitors_in_space(self, space_id: str):
-        # Start all monitors in a space
-        # First, get all monitors for the space
         monitors_to_start = self.database.get_monitors_for_space(space_id)
         self.logger.info(f"Found {len(monitors_to_start)} monitors in space: {space_id}")
         
@@ -221,7 +254,6 @@ class MonitorScheduler:
         self.logger.info(f"Started {len(monitors_to_schedule)} monitors in space: {space_id}")
 
     def stop_all_monitors_in_space(self, space_id: str):
-        # Stop all monitors in a space
         with self.monitor_lock:
             for monitor, job in list(self.running_monitors.items()):
                 if monitor.space_id == space_id:
@@ -233,7 +265,6 @@ class MonitorScheduler:
             self.logger.info(f"Stopped all monitors in space: {space_id}")
 
     def stop_all_monitors(self):
-        # Stop all monitors
         with self.monitor_lock:
             for monitor, job in self.running_monitors.items():
                 schedule.cancel_job(job)
@@ -243,7 +274,23 @@ class MonitorScheduler:
             self.running_monitors.clear()
             self.logger.info("Stopped all monitors")
 
+    def get_system_job_status(self) -> List[Dict[str, Any]]:
+        status_list = []
+        for job_name, job in self.system_jobs.items():
+            status = job.get_status()
+            status['enabled'] = job_name in self.system_job_schedules
+            status_list.append(status)
+        return status_list
+
+    def run_system_job_manually(self, job_name: str) -> bool:
+        if job_name in self.system_jobs:
+            job = self.system_jobs[job_name]
+            self.logger.info(f"Manually running system job: {job_name}")
+            return job.run()
+        else:
+            self.logger.warning(f"System job not found: {job_name}")
+            return False
+
     def stop(self):
-        # Stop the scheduler
         self.stop_event.set()
         self.scheduler_thread.join()

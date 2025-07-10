@@ -1,7 +1,8 @@
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 
 from webmonitor.models import BaseMonitor, UrlMonitor, DatabaseMonitor, MonitorType, MonitorStatus
 from .models import MonitorModel
@@ -139,6 +140,26 @@ class MonitorRepository:
         db_monitor = session.query(MonitorModel).filter(MonitorModel.id == monitor_id).first()
         if not db_monitor:
             return False
-        
+
         session.delete(db_monitor)
         return True
+
+    @staticmethod
+    def get_unhealthy_monitors(session: Session, unhealthy_threshold_hours: int) -> List[BaseMonitor]:
+        threshold_time = datetime.now() - timedelta(hours=unhealthy_threshold_hours)
+
+        # Find monitors that:
+        # 1. Have been checked at least once (last_checked_at is not None)
+        # 2. Either have never been healthy OR last_healthy_at is older than threshold
+        # 3. Are not currently OFFLINE (meaning they're being monitored)
+        db_monitors = session.query(MonitorModel).filter(
+            and_(
+                MonitorModel.last_checked_at.isnot(None),  # Has been checked
+                MonitorModel.status != MonitorStatus.OFFLINE.value,  # Is being monitored
+                # Either never been healthy OR last healthy time is old
+                (MonitorModel.last_healthy_at.is_(None)) |
+                (MonitorModel.last_healthy_at < threshold_time)
+            )
+        ).all()
+
+        return MonitorRepository._to_domain_models(db_monitors)

@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.pool import QueuePool
@@ -117,6 +117,13 @@ class Database:
             raise e
         finally:
             session.close()
+
+    def get_unhealthy_monitors(self, unhealthy_threshold_hours: int) -> List[BaseMonitor]:
+        session = self.Session()
+        try:
+            return MonitorRepository.get_unhealthy_monitors(session, unhealthy_threshold_hours)
+        finally:
+            session.close()
     
     # Monitor result operations
     def save_result(self, result: MonitorResult) -> MonitorResult:
@@ -142,5 +149,22 @@ class Database:
         session = self.Session()
         try:
             return ResultRepository.get_by_space_id(session, space_id, limit)
+        finally:
+            session.close()
+
+    def cleanup_old_results(self, keep_healthy_days: int, keep_unhealthy_days: int, batch_size: int = 1000) -> Dict[str, Any]:
+        session = self.Session()
+        try:
+            return ResultRepository.cleanup_old_results(session, keep_healthy_days, keep_unhealthy_days, batch_size)
+        except Exception as e:
+            session.rollback()
+            raise e
+        finally:
+            session.close()
+
+    def get_cleanup_preview(self, keep_healthy_days: int, keep_unhealthy_days: int) -> Dict[str, Any]:
+        session = self.Session()
+        try:
+            return ResultRepository.get_cleanup_preview(session, keep_healthy_days, keep_unhealthy_days)
         finally:
             session.close()

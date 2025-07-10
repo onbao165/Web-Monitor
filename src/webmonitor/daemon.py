@@ -42,12 +42,12 @@ class WebMonitorDaemon:
         """Initialize email service with configuration."""
         try:
             from .services.email_service import get_email_service
-            from .services.email_config import get_email_config
+            from .config import get_config_manager
 
-            email_config = get_email_config()
+            config_manager = get_config_manager()
             email_service = get_email_service()
 
-            if email_config.is_configured():
+            if config_manager.is_email_configured():
                 self.logger.info("Email service configured and ready")
             else:
                 self.logger.warning("Email service not configured - notifications will be disabled")

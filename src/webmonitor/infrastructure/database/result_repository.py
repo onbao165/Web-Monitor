@@ -74,3 +74,126 @@ class ResultRepository:
             .all()
 
         return ResultRepository._to_domain_models(db_results)
+
+    @staticmethod
+    def cleanup_old_results(session: Session, keep_healthy_days: int, keep_unhealthy_days: int, batch_size: int = 1000) -> Dict[str, Any]:
+        """
+        Clean up old monitor results based on retention policies.
+        Returns statistics about the cleanup operation.
+        """
+        from sqlalchemy import and_
+
+        now = datetime.now()
+        healthy_cutoff = now - timedelta(days=keep_healthy_days)
+        unhealthy_cutoff = now - timedelta(days=keep_unhealthy_days)
+
+        cleanup_stats = {
+            'healthy_deleted': 0,
+            'unhealthy_deleted': 0,
+            'total_deleted': 0,
+            'batches_processed': 0,
+            'start_time': now,
+            'errors': []
+        }
+
+        try:
+            # Clean up old healthy results
+            healthy_deleted = ResultRepository._cleanup_results_by_status(
+                session, healthy_cutoff, MonitorStatus.HEALTHY, batch_size
+            )
+            cleanup_stats['healthy_deleted'] = healthy_deleted
+
+            # Clean up old unhealthy results (UNHEALTHY and UNKNOWN)
+            unhealthy_deleted = 0
+            for status in [MonitorStatus.UNHEALTHY, MonitorStatus.UNKNOWN]:
+                deleted = ResultRepository._cleanup_results_by_status(
+                    session, unhealthy_cutoff, status, batch_size
+                )
+                unhealthy_deleted += deleted
+
+            cleanup_stats['unhealthy_deleted'] = unhealthy_deleted
+            cleanup_stats['total_deleted'] = healthy_deleted + unhealthy_deleted
+
+        except Exception as e:
+            cleanup_stats['errors'].append(str(e))
+            raise
+
+        cleanup_stats['end_time'] = datetime.now()
+        cleanup_stats['duration_seconds'] = (cleanup_stats['end_time'] - cleanup_stats['start_time']).total_seconds()
+
+        return cleanup_stats
+
+    @staticmethod
+    def _cleanup_results_by_status(session: Session, cutoff_date: datetime, status: MonitorStatus, batch_size: int) -> int:
+        """Clean up results for a specific status in batches."""
+        total_deleted = 0
+
+        while True:
+            # Find a batch of old results to delete
+            old_results = session.query(MonitorResultModel)\
+                .filter(and_(
+                    MonitorResultModel.timestamp < cutoff_date,
+                    MonitorResultModel.status == status.value
+                ))\
+                .limit(batch_size)\
+                .all()
+
+            if not old_results:
+                break  # No more results to delete
+
+            # Delete the batch
+            for result in old_results:
+                session.delete(result)
+
+            batch_count = len(old_results)
+            total_deleted += batch_count
+
+            # Commit the batch to avoid long-running transactions
+            session.commit()
+
+            # If we got less than batch_size, we're done
+            if batch_count < batch_size:
+                break
+
+        return total_deleted
+
+    @staticmethod
+    def get_cleanup_preview(session: Session, keep_healthy_days: int, keep_unhealthy_days: int) -> Dict[str, Any]:
+        """
+        Preview what would be deleted without actually deleting anything.
+        Useful for safety checks and reporting.
+        """
+        from sqlalchemy import and_, func
+
+        now = datetime.now()
+        healthy_cutoff = now - timedelta(days=keep_healthy_days)
+        unhealthy_cutoff = now - timedelta(days=keep_unhealthy_days)
+
+        # Count healthy results that would be deleted
+        healthy_count = session.query(func.count(MonitorResultModel.id))\
+            .filter(and_(
+                MonitorResultModel.timestamp < healthy_cutoff,
+                MonitorResultModel.status == MonitorStatus.HEALTHY.value
+            ))\
+            .scalar()
+
+        # Count unhealthy results that would be deleted
+        unhealthy_count = session.query(func.count(MonitorResultModel.id))\
+            .filter(and_(
+                MonitorResultModel.timestamp < unhealthy_cutoff,
+                MonitorResultModel.status.in_([MonitorStatus.UNHEALTHY.value, MonitorStatus.UNKNOWN.value])
+            ))\
+            .scalar()
+
+        # Get total count for reference
+        total_count = session.query(func.count(MonitorResultModel.id)).scalar()
+
+        return {
+            'healthy_to_delete': healthy_count,
+            'unhealthy_to_delete': unhealthy_count,
+            'total_to_delete': healthy_count + unhealthy_count,
+            'total_results': total_count,
+            'retention_after_cleanup': total_count - (healthy_count + unhealthy_count),
+            'healthy_cutoff_date': healthy_cutoff,
+            'unhealthy_cutoff_date': unhealthy_cutoff
+        }
