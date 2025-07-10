@@ -28,8 +28,6 @@ def check_db(monitor: DatabaseMonitor) -> MonitorResult:
     
     try:
         logger = logging.getLogger(__name__)
-        logger.info(f"Checking database: {monitor.name} ({monitor.id})")
-        logger.info(f"Connection string: {monitor.test_connection_string()}")
         # Connect to database
         engine = create_engine(
             monitor.test_connection_string(), 
@@ -52,7 +50,8 @@ def check_db(monitor: DatabaseMonitor) -> MonitorResult:
                     elif monitor.db_type.lower() == 'mysql':
                         connection.execute(text(f"SET max_execution_time = {monitor.query_timeout_seconds * 1000}"))
                     elif monitor.db_type.lower() == 'sqlserver':
-                        connection.execute(text(f"SET QUERY_GOVERNOR_COST_LIMIT = {monitor.query_timeout_seconds * 1000}"))
+                        # For SQL Server, set lock timeout (in milliseconds)
+                        connection.execute(text(f"SET LOCK_TIMEOUT {monitor.query_timeout_seconds * 1000}"))
                     
                     # Execute the test query
                     result = connection.execute(text(monitor.test_query))
@@ -61,7 +60,8 @@ def check_db(monitor: DatabaseMonitor) -> MonitorResult:
                         'executed': True,
                         'message': f"Query '{monitor.test_query}' executed successfully. Rows affected: {row_count}"
                     }
-                except SQLAlchemyError:
+                except SQLAlchemyError as e:
+                    logger.error(f"Error executing query: {str(e)}", exc_info=True)
                     failed_checks += 1
                     status = MonitorStatus.UNHEALTHY
                     details['query'] = {

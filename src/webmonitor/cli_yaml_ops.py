@@ -30,9 +30,6 @@ def create_space_from_file(send_command, file: str) -> Dict:
 def update_space_from_file(send_command, file: str) -> Dict:
     space_data = load_yaml_file(file)
     
-    # Ensure the ID in the command takes precedence
-    space_data['id'] = space_id
-    
     return send_command({
         'action': 'update_space',
         'space': space_data
@@ -53,9 +50,6 @@ def create_monitor_from_file(send_command, file: str) -> Dict:
 
 def update_monitor_from_file(send_command, file: str) -> Dict:
     monitor_data = load_yaml_file(file)
-    
-    # Ensure the ID in the command takes precedence
-    monitor_data['id'] = monitor_id
     
     return send_command({
         'action': 'update_monitor',

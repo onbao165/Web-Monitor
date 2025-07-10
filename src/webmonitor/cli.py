@@ -400,7 +400,7 @@ def create_monitor_from_file_command(file):
 
 @monitor.command('update-from-file', help='Update a monitor from a YAML file')
 @click.option('--file', '-f', type=click.Path(exists=True), required=True, help='YAML file containing monitor definition')
-def update_monitor_from_file_command(monitor_id, file):
+def update_monitor_from_file_command(file):
     response = update_monitor_from_file(send_command, file)
     format_response(response)
 

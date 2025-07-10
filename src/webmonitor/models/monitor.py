@@ -5,6 +5,7 @@ import json
 import uuid
 from enum import Enum
 from webmonitor.utils import encrypt_password, decrypt_password
+import urllib.parse
 
 class MonitorType(Enum):
     URL = 'url'
@@ -192,13 +193,16 @@ class DatabaseMonitor(BaseMonitor):
     def test_connection_string(self) -> str:
         # Generate connection string for testing (password is decrypted on-demand)
         password = self.password  # This will decrypt the password
+        # URL encode the password to handle special characters like @
+        encoded_password = urllib.parse.quote_plus(password)
         
         if self.db_type.lower() == 'postgresql':
-            return f"postgresql://{self.username}:{password}@{self.host}:{self.port}/{self.database}"
+            return f"postgresql://{self.username}:{encoded_password}@{self.host}:{self.port}/{self.database}"
         elif self.db_type.lower() == 'mysql':
-            return f"mysql+pymysql://{self.username}:{password}@{self.host}:{self.port}/{self.database}"
+            return f"mysql+pymysql://{self.username}:{encoded_password}@{self.host}:{self.port}/{self.database}"
         elif self.db_type.lower() == 'sqlserver':
-            return f"mssql+pyodbc://{self.username}:{password}@{self.host}:{self.port}/{self.database}?driver=ODBC+Driver+17+for+SQL+Server"
+            # Fix the connection string format for SQL Server with encoded password
+            return f"mssql+pyodbc://{self.username}:{encoded_password}@{self.host}:{self.port}/{self.database}?driver=ODBC+Driver+17+for+SQL+Server&TrustServerCertificate=yes"
         else:
             raise ValueError(f"Unsupported database type: {self.db_type}")
 

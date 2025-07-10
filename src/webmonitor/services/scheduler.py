@@ -60,6 +60,10 @@ class MonitorScheduler:
             monitor.update_last_checked_at()
             if result.status == MonitorStatus.HEALTHY:
                 monitor.update_last_healthy_at()
+
+            # Get the most recent previous result for comparison
+            previous_results = self.database.get_results_for_monitor(monitor.id, limit=1)
+            previous_result = previous_results[0] if previous_results else None
             
             # Save result and updated monitor
             self.database.save_result(result)
@@ -67,17 +71,13 @@ class MonitorScheduler:
             
             self.logger.info(f"Monitor check completed: {monitor.name} ({monitor.id}) - Status: {result.status.value}")
 
-            # Get the most recent previous result for comparison
-            previous_results = self.database.get_results_for_monitor(monitor.id, limit=1)
-            previous_result = previous_results[0] if previous_results else None
-
             # Send notifications if there's a status change
             if should_send_notification(result, previous_result):
                 # Get space to access notification settings
                 space = self.database.get_space(monitor.space_id)
                 
                 if space and space.notification_emails:
-                    recipients = space.notification_emails.split(',')
+                    recipients = space.notification_emails
                     send_monitor_result_email(space, result, recipients)
                     self.logger.info(f"Status change notification sent for monitor: {monitor.name}")
         
