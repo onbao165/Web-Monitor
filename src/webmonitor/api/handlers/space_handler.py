@@ -87,6 +87,10 @@ class SpaceCommandHandler:
             description=space_data.get('description'),
             notification_emails=space_data.get('notification_emails', [])
         )
+
+        # Use provided ID if provided
+        if 'id' in space_data:
+            space.id = space_data['id']
         
         saved_space = self.database.save_space(space)
         return {

@@ -172,6 +172,10 @@ class MonitorCommandHandler:
                 monitor.password = monitor_data['password']
         else:
             return {'status': 'error', 'message': 'Invalid monitor type'}
+
+        # Use provided ID if provided
+        if 'id' in monitor_data:
+            monitor.id = monitor_data['id']
             
         saved_monitor = self.database.save_monitor(monitor)
             
