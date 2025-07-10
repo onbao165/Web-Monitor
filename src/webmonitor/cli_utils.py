@@ -2,7 +2,8 @@ import json
 import socket
 import click
 import os
-from typing import Dict, Any
+import uuid
+from typing import Dict, Any, Tuple
 
 # Config socket path
 SOCKET_PATH = os.getenv('SOCKET_PATH', '/tmp/webmonitor.sock')
@@ -207,3 +208,35 @@ def warning_message(message: str) -> None:
 
 def info_message(message: str) -> None:
     click.echo(click.style(f"ℹ️  {message}", fg='blue'))
+
+def is_uuid(identifier: str) -> bool:
+    try:
+        uuid.UUID(identifier)
+        return True
+    except ValueError:
+        return False
+
+def resolve_space_identifier(identifier: str) -> Tuple[str, Dict[str, Any]]:
+    """
+    Resolve space identifier to command parameters.
+    Returns action name and command dict.
+    """
+    if is_uuid(identifier):
+        return 'space_id', {'space_id': identifier}
+    else:
+        return 'space_name', {'space_name': identifier}
+
+def resolve_monitor_identifier(identifier: str, space_id: str = None, space_name: str = None) -> Tuple[str, Dict[str, Any]]:
+    """
+    Resolve monitor identifier to command parameters.
+    Returns action name and command dict.
+    """
+    if is_uuid(identifier):
+        return 'monitor_id', {'monitor_id': identifier}
+    else:
+        command = {'monitor_name': identifier}
+        if space_id:
+            command['space_id'] = space_id
+        if space_name:
+            command['space_name'] = space_name
+        return 'monitor_name', command

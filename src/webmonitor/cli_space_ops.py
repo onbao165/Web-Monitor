@@ -2,7 +2,7 @@ import os
 import sys
 import yaml
 import click
-from .cli_utils import send_command, format_response
+from .cli_utils import send_command, format_response, resolve_space_identifier
 
 def load_yaml_file(file_path: str) -> dict:
     try:
@@ -95,16 +95,20 @@ def get_space(space_id):
     response = send_command({'action': 'get_space', 'space_id': space_id})
     format_response(response)
 
-@space.command('start', help='Start all monitors in a space')
-@click.argument('space_id')
-def start_space(space_id):
-    response = send_command({'action': 'start_space', 'space_id': space_id})
+@space.command('start', help='Start all monitors in a space (accepts ID or name)')
+@click.argument('space_identifier')
+def start_space(space_identifier):
+    _, command_params = resolve_space_identifier(space_identifier)
+    command_params['action'] = 'start_space'
+    response = send_command(command_params)
     format_response(response)
 
-@space.command('stop', help='Stop all monitors in a space')
-@click.argument('space_id')
-def stop_space(space_id):
-    response = send_command({'action': 'stop_space', 'space_id': space_id})
+@space.command('stop', help='Stop all monitors in a space (accepts ID or name)')
+@click.argument('space_identifier')
+def stop_space(space_identifier):
+    _, command_params = resolve_space_identifier(space_identifier)
+    command_params['action'] = 'stop_space'
+    response = send_command(command_params)
     format_response(response)
 
 @space.command('delete', help='Delete a space and all its monitors')

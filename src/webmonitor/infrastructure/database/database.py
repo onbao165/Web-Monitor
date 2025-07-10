@@ -92,6 +92,13 @@ class Database:
         finally:
             session.close()
 
+    def get_monitor_by_name(self, name: str, space_id: str = None, space_name: str = None) -> Optional[BaseMonitor]:
+        session = self.Session()
+        try:
+            return MonitorRepository.get_by_name(session, name, space_id, space_name)
+        finally:
+            session.close()
+
     def list_monitors(self) -> List[BaseMonitor]:
         session = self.Session()
         try:

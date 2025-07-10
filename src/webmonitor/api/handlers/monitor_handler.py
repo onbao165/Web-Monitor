@@ -17,29 +17,56 @@ class MonitorCommandHandler:
     def start_monitor(self, cmd: Dict[str, Any]) -> Dict[str, Any]:
         # Start a monitor
         monitor_id = cmd.get('monitor_id')
-        if not monitor_id:
-            return {'status': 'error', 'message': 'Monitor ID required'}
-            
-        monitor = self.database.get_monitor(monitor_id)
-        if not monitor:
-            return {'status': 'error', 'message': 'Monitor not found'}
-            
+        monitor_name = cmd.get('monitor_name')
+        space_id = cmd.get('space_id')
+        space_name = cmd.get('space_name')
+
+        if not monitor_id and not monitor_name:
+            return {'status': 'error', 'message': 'Monitor ID or name required'}
+
+        # If name is provided but not ID, try to resolve the name to an ID
+        if not monitor_id and monitor_name:
+            monitor = self.database.get_monitor_by_name(monitor_name, space_id, space_name)
+            if not monitor:
+                space_msg = f' in space "{space_id}"' if space_id else ''
+                return {'status': 'error', 'message': f'Monitor with name "{monitor_name}"{space_msg} not found'}
+            monitor_id = monitor.id
+        else:
+            monitor = self.database.get_monitor(monitor_id)
+            if not monitor:
+                return {'status': 'error', 'message': 'Monitor not found'}
+
         success = self.scheduler.schedule_monitor(monitor)
         return {
-            'status': 'success' if success else 'error', 
-            'message': f'Monitor {monitor_id} started' if success else 'Failed to start monitor'
+            'status': 'success' if success else 'error',
+            'message': f'Monitor {monitor.name} started' if success else 'Failed to start monitor'
         }
     
     def stop_monitor(self, cmd: Dict[str, Any]) -> Dict[str, Any]:
         # Stop a monitor
         monitor_id = cmd.get('monitor_id')
-        if not monitor_id:
-            return {'status': 'error', 'message': 'Monitor ID required'}
-            
+        monitor_name = cmd.get('monitor_name')
+        space_id = cmd.get('space_id')
+
+        if not monitor_id and not monitor_name:
+            return {'status': 'error', 'message': 'Monitor ID or name required'}
+
+        # If name is provided but not ID, try to resolve the name to an ID
+        if not monitor_id and monitor_name:
+            monitor = self.database.get_monitor_by_name(monitor_name, space_id)
+            if not monitor:
+                space_msg = f' in space "{space_id}"' if space_id else ''
+                return {'status': 'error', 'message': f'Monitor with name "{monitor_name}"{space_msg} not found'}
+            monitor_id = monitor.id
+            monitor_display_name = monitor.name
+        else:
+            monitor = self.database.get_monitor(monitor_id)
+            monitor_display_name = monitor.name if monitor else monitor_id
+
         success = self.scheduler.stop_monitor(monitor_id)
         return {
-            'status': 'success' if success else 'error', 
-            'message': f'Monitor {monitor_id} stopped' if success else 'Failed to stop monitor'
+            'status': 'success' if success else 'error',
+            'message': f'Monitor {monitor_display_name} stopped' if success else 'Failed to stop monitor'
         }
     
     def list_monitors(self, cmd: Dict[str, Any]) -> Dict[str, Any]:
@@ -93,6 +120,11 @@ class MonitorCommandHandler:
         space = self.database.get_space(monitor_data['space_id'])
         if not space:
             return {'status': 'error', 'message': 'Space not found'}
+
+        # Check if monitor name already exists
+        existing_monitor = self.database.get_monitor_by_name(monitor_data['name'], monitor_data['space_id'])
+        if existing_monitor:
+            return {'status': 'error', 'message': 'Monitor name already exists in this space'}
             
         monitor_type = monitor_data.get('monitor_type')
         if not monitor_type:
@@ -168,6 +200,11 @@ class MonitorCommandHandler:
             
         # Update common fields
         if 'name' in monitor_data:
+            # Check if new name already exists
+            if monitor_data['name'] != monitor.name:
+                existing_monitor = self.database.get_monitor_by_name(monitor_data['name'], monitor.space_id)
+                if existing_monitor and existing_monitor.id != monitor.id:
+                    return {'status': 'error', 'message': 'Monitor name already exists in this space'}
             monitor.name = monitor_data['name']
         if 'check_interval_seconds' in monitor_data:
             monitor.check_interval_seconds = monitor_data['check_interval_seconds']

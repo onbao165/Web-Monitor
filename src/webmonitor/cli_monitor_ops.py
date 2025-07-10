@@ -2,7 +2,7 @@ import os
 import sys
 import yaml
 import click
-from .cli_utils import send_command, format_response
+from .cli_utils import send_command, format_response, resolve_monitor_identifier
 
 def load_yaml_file(file_path: str) -> dict:
     try:
@@ -155,16 +155,24 @@ def get_monitor(monitor_id):
     response = send_command({'action': 'get_monitor', 'monitor_id': monitor_id})
     format_response(response)
 
-@monitor.command('start', help='Start a monitor')
-@click.argument('monitor_id')
-def start_monitor(monitor_id):
-    response = send_command({'action': 'start_monitor', 'monitor_id': monitor_id})
+@monitor.command('start', help='Start a monitor (accepts ID or name)')
+@click.argument('monitor_identifier')
+@click.option('--space-id', help='Space ID to search for monitor by name (optional if monitor name is unique)')
+@click.option('--space-name', help='Space name to search for monitor by name (optional if monitor name is unique)')
+def start_monitor(monitor_identifier, space_id, space_name):
+    _, command_params = resolve_monitor_identifier(monitor_identifier, space_id, space_name)
+    command_params['action'] = 'start_monitor'
+    response = send_command(command_params)
     format_response(response)
 
-@monitor.command('stop', help='Stop a monitor')
-@click.argument('monitor_id')
-def stop_monitor(monitor_id):
-    response = send_command({'action': 'stop_monitor', 'monitor_id': monitor_id})
+@monitor.command('stop', help='Stop a monitor (accepts ID or name)')
+@click.argument('monitor_identifier')
+@click.option('--space-id', help='Space ID to search for monitor by name (optional if monitor name is unique)')
+@click.option('--space-name', help='Space name to search for monitor by name (optional if monitor name is unique)')
+def stop_monitor(monitor_identifier, space_id, space_name):
+    _, command_params = resolve_monitor_identifier(monitor_identifier, space_id, space_name)
+    command_params['action'] = 'stop_monitor'
+    response = send_command(command_params)
     format_response(response)
 
 @monitor.command('delete', help='Delete a monitor')

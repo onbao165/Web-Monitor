@@ -126,6 +126,20 @@ class MonitorRepository:
         return MonitorRepository._to_domain_model(db_monitor)
 
     @staticmethod
+    def get_by_name(session: Session, name: str, space_id: str = None, space_name: str = None) -> Optional[BaseMonitor]:
+        query = session.query(MonitorModel).filter(MonitorModel.name == name)
+        if space_id:
+            query = query.filter(MonitorModel.space_id == space_id)
+        if space_name:
+            query = query.join(SpaceModel).filter(SpaceModel.name == space_name)
+
+        db_monitor = query.first()
+        if not db_monitor:
+            return None
+
+        return MonitorRepository._to_domain_model(db_monitor)
+
+    @staticmethod
     def list_all(session: Session) -> List[BaseMonitor]:
         db_monitors = session.query(MonitorModel).all()
         return MonitorRepository._to_domain_models(db_monitors)

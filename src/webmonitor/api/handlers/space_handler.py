@@ -15,18 +15,36 @@ class SpaceCommandHandler:
     def start_space(self, cmd: Dict[str, Any]) -> Dict[str, Any]:
         # Start all monitors in a space
         space_id = cmd.get('space_id')
-        if not space_id:
-            return {'status': 'error', 'message': 'Space ID required'}
-            
+        space_name = cmd.get('space_name')
+
+        if not space_id and not space_name:
+            return {'status': 'error', 'message': 'Space ID or name required'}
+
+        # If name is provided but not ID, try to resolve the name to an ID
+        if not space_id and space_name:
+            space = self.database.get_space_by_name(space_name)
+            if not space:
+                return {'status': 'error', 'message': f'Space with name "{space_name}" not found'}
+            space_id = space.id
+
         self.scheduler.start_all_monitors_in_space(space_id)
         return {'status': 'success', 'message': f'All monitors in space {space_id} started'}
     
     def stop_space(self, cmd: Dict[str, Any]) -> Dict[str, Any]:
         # Stop all monitors in a space
         space_id = cmd.get('space_id')
-        if not space_id:
-            return {'status': 'error', 'message': 'Space ID required'}
-            
+        space_name = cmd.get('space_name')
+
+        if not space_id and not space_name:
+            return {'status': 'error', 'message': 'Space ID or name required'}
+
+        # If name is provided but not ID, try to resolve the name to an ID
+        if not space_id and space_name:
+            space = self.database.get_space_by_name(space_name)
+            if not space:
+                return {'status': 'error', 'message': f'Space with name "{space_name}" not found'}
+            space_id = space.id
+
         self.scheduler.stop_all_monitors_in_space(space_id)
         return {'status': 'success', 'message': f'All monitors in space {space_id} stopped'}
     
@@ -58,6 +76,11 @@ class SpaceCommandHandler:
         space_data = cmd.get('space')
         if not space_data or 'name' not in space_data:
             return {'status': 'error', 'message': 'Space name required'}
+
+        # Check if space name already exists
+        existing_space = self.database.get_space_by_name(space_data['name'])
+        if existing_space:
+            return {'status': 'error', 'message': 'Space name already exists'}
             
         space = Space(
             name=space_data['name'],
@@ -84,6 +107,11 @@ class SpaceCommandHandler:
             
         # Update fields
         if 'name' in space_data:
+            # Check if new name already exists
+            if space_data['name'] != space.name:
+                existing_space = self.database.get_space_by_name(space_data['name'])
+                if existing_space and existing_space.id != space.id:
+                    return {'status': 'error', 'message': 'Space name already exists'}
             space.name = space_data['name']
         if 'description' in space_data:
             space.description = space_data['description']
