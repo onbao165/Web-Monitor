@@ -90,4 +90,3 @@ class SystemCommandHandler:
             'data_cleanup': 'data_cleanup'
         }
         return name_mapping.get(cli_name, cli_name)
-

@@ -168,50 +168,6 @@ def jobs_preview():
     except Exception as e:
         click.echo(click.style(f"Error getting cleanup preview: {str(e)}", fg='red'), err=True)
 
-@jobs.command('logs', help='Show recent logs for a job')
-@click.argument('job_name')
-@click.option('--lines', '-n', default=50, help='Number of log lines to show')
-def jobs_logs(job_name, lines):
-    try:
-        response = send_command({
-            'action': 'get_job_logs',
-            'job_name': job_name,
-            'lines': lines
-        })
-
-        if response.get('status') != 'success':
-            click.echo(click.style(f"Error: {response.get('message', 'Unknown error')}", fg='red'), err=True)
-            return
-
-        logs = response.get('logs', [])
-
-        if not logs:
-            click.echo(click.style(f"No logs found for job: {job_name}", fg='yellow'))
-            return
-
-        click.echo(click.style(f"Recent Logs for {job_name.upper()}", fg='blue', bold=True))
-        click.echo("=" * 50)
-
-        for log_entry in logs:
-            timestamp = log_entry.get('timestamp', '')
-            level = log_entry.get('level', 'INFO')
-            message = log_entry.get('message', '')
-
-            # Color code by log level
-            if level == 'ERROR':
-                level_color = 'red'
-            elif level == 'WARNING':
-                level_color = 'yellow'
-            elif level == 'INFO':
-                level_color = 'green'
-            else:
-                level_color = 'white'
-
-            click.echo(f"{timestamp} {click.style(level, fg=level_color)} {message}")
-
-    except Exception as e:
-        click.echo(click.style(f"Error getting job logs: {str(e)}", fg='red'), err=True)
-
 @jobs.command('schedule', help='Show job schedules')
 def jobs_schedule():
     try:
